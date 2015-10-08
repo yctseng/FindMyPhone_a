@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">FindMyPhone</string>
+
+    <string name="action_stop">STOP</string>
+    <string name="action_app_terminate">App Exit.</string>
+    <string name="action_settings">Settings</string>
+    <string name="err_notification_mgr_null">Can not connect to NotificationManager</string>
+
+    <string name="notification_title">FindMyPhone</string>
+    <string name="notification_body">Touch me to clear</string>
+
+</resources>
