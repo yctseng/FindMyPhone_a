@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -33,6 +34,7 @@ public class MainActivity extends Activity {
     public static final String STRING_MODE_STOP = "MODE_STOP";
     public static final String STRING_MODE_VIBRATE = "MODE_VIBRATE";
     public static final String STRING_MODE_RINGING = "MODE_RINGING";
+    public static final String STRING_QUERY_MODE = "QUERY_MODE";
 
     // Must the same as the UUID of the pebble app. Check the UUID in the settings of the project.
     public static final UUID APP_UUID = UUID.fromString("3783cff2-5a14-477d-baee-b77bd423d079");
@@ -42,10 +44,12 @@ public class MainActivity extends Activity {
     private Button mBtnStop;
     public static int notifyID = 334455;
 
+    private int mFinishTimer = 2000;
     private int mOrigVolume = -1;
     private boolean mShowVolumeUI = false;
     private int mVolumeFlags = mShowVolumeUI ? AudioManager.FLAG_SHOW_UI : 0;
     private boolean mStoped = false;
+    private boolean mIsQueryMode = false;
 
     private void restoreVolume() {
         if (DEBUG) Log.v(TAG,"restoreVolume");
@@ -60,6 +64,25 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void updateState(Intent i) {
+        String tmpMode;
+        tmpMode = i.getStringExtra("mode");
+        Log.d(TAG, "updateState tmpMode:"+tmpMode);
+        if (tmpMode == null) {
+            mStartMode = STRING_MODE_INIT;
+            mIsQueryMode = false;
+        }
+        else if(tmpMode.equals(STRING_QUERY_MODE)) {
+            mIsQueryMode = true;
+        }
+        else {
+            mStartMode = tmpMode;
+            mIsQueryMode = false;
+        }
+
+        Log.d(TAG, "updateState result mStartMode:" + mStartMode + " mIsQueryMode:" + mIsQueryMode);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         if (DEBUG) Log.v(TAG, "onCreate");
@@ -72,18 +95,32 @@ public class MainActivity extends Activity {
        }
 
         Intent initIntent = this.getIntent();
-        mStartMode = initIntent.getStringExtra("mode");
-        if(mStartMode==null)
-            mStartMode = STRING_MODE_INIT;
+        updateState(initIntent);
+
         if(DEBUG) Log.d(TAG,"mode:"+mStartMode+" vs "+STRING_MODE_STOP);
 
-        if(STRING_MODE_STOP.equals(mStartMode)) {
+        if(STRING_MODE_STOP.equals(mStartMode) ) {
             if(DEBUG) Log.d(TAG, "on create should finish!!");
             mStoped = true;
             finish();
+            notifyPebbleState(STRING_MODE_STOP);
             return;
         }
-
+        if(mIsQueryMode) {
+            notifyPebbleState(mStartMode);
+            if(mStartMode == null) {
+                if (DEBUG) Log.d(TAG, "on create should finish due to Query mode!!");
+                //finish();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Close this activity
+                        finish();
+                    }
+                }, mFinishTimer);
+                //return;
+            }
+        }
         setContentView(R.layout.activity_main);
         mBtnStop = (Button) findViewById(R.id.button_stop);
         mBtnStop.setOnClickListener(new Button.OnClickListener() {
@@ -97,6 +134,7 @@ public class MainActivity extends Activity {
                 }
                 Toast.makeText(getApplicationContext(), R.string.action_app_terminate, Toast.LENGTH_SHORT).show();
                 finish();
+                notifyPebbleState(STRING_MODE_STOP);
             }
         });
 
@@ -139,11 +177,13 @@ public class MainActivity extends Activity {
         if(mStoped) {
             if(DEBUG) Log.w(TAG, "mStoped:"+mStoped+" onResume STOP!!!");
             finish();
+            notifyPebbleState(STRING_MODE_STOP);
             return;
         }
         if(mStartMode != null)
             notifyPebbleState(mStartMode);
-
+        else
+            Toast.makeText(getApplicationContext(), R.string.warning_not_launch_on_pebble, Toast.LENGTH_SHORT).show();
         Context context = getApplicationContext();
         boolean isConnected = PebbleKit.isWatchConnected(context);
         if(isConnected) {
@@ -203,7 +243,7 @@ public class MainActivity extends Activity {
     public void finish() {
         super.finish();
         restoreVolume();
-        notifyPebbleState(STRING_MODE_STOP);
+        //notifyPebbleState(STRING_MODE_STOP);
     }
 
     protected void onNewIntent(Intent intent) {
@@ -211,20 +251,43 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         setIntent(intent);//must store the new intent unless getIntent() will return the old one
 
-        mStartMode = intent.getStringExtra("mode");
-        if(mStartMode==null)
-            mStartMode = STRING_MODE_INIT;
+        updateState(intent);
+
         if(DEBUG) Log.d(TAG,"initIntent:"+intent+" mode:"+mStartMode);
         if(STRING_MODE_STOP.equals(mStartMode)) {
             if(DEBUG) Log.d(TAG, "onNewIntent should finish!!");
             mStoped = true;
         }
+
+        if(mIsQueryMode) {
+            notifyPebbleState(mStartMode);
+            if(mStartMode == null) {
+                if (DEBUG) Log.d(TAG, "onNewIntent Query mode, finish()!");
+                //finish();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        // Close this activity
+                        finish();
+                    }
+                }, mFinishTimer);
+                //return;
+            }
+        }
     }
 
     private void notifyPebbleState(String mode) {
         if(DEBUG) Log.d(TAG, "notifyPebbleState mode:"+mode);
+        String nowMode;
+
+        if(mode== null) {
+            nowMode = STRING_MODE_INIT;
+        }
+        else {
+            nowMode = mode;
+        }
         PebbleDictionary outgoing = new PebbleDictionary();
-        outgoing.addString(OUTGOING_KEY_MODE, mode);
+        outgoing.addString(OUTGOING_KEY_MODE, nowMode);
         PebbleKit.sendDataToPebble(getApplicationContext(), APP_UUID, outgoing);
     }
 }

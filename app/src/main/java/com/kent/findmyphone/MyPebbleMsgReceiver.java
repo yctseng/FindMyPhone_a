@@ -74,9 +74,10 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     myNotiBuilder.setContentIntent(PendingIntent.getActivity(context, 0, new Intent(), 0));
                 }
 
-                // No matter what key event, cancel the notification first and maybe launch again to avoid some issues.
-                notificationManager.cancel(MainActivity.notifyID);
-
+                // Cancel the notification first and maybe launch again to avoid some issues UNLESS it's QUERY_MODE
+                if (data.getInteger(MainActivity.KEY_QUERY_MODE) == null) {
+                    notificationManager.cancel(MainActivity.notifyID);
+                }
                 // Used to launch app to setVolume to max level.
                 Intent actionIntent = new Intent();
                 actionIntent.setClassName("com.kent.findmyphone", "com.kent.findmyphone.MainActivity");
@@ -123,6 +124,9 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     if(DEBUG) Log.v(TAG, "KEY_BUTTON_SELECT. Stop!");
 
                     actionIntent.putExtra("mode", MainActivity.STRING_MODE_STOP);
+                } else if (data.getInteger(MainActivity.KEY_QUERY_MODE) != null) {
+                    if(DEBUG) Log.v(TAG, "KEY_QUERY_MODE.");
+                    actionIntent.putExtra("mode", MainActivity.STRING_QUERY_MODE);
                 } else {
                     if(DEBUG) Log.v(TAG, "Unknown key received. data:"+ data);
                     return;

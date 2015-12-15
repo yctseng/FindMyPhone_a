@@ -5,8 +5,8 @@
     <string name="action_app_terminate">App Exit.</string>
     <string name="action_settings">Settings</string>
     <string name="err_notification_mgr_null">Can not connect to NotificationManager</string>
+    <string name="warning_not_launch_on_pebble">Use this app on your Pebble</string>
 
     <string name="notification_title">FindMyPhone</string>
     <string name="notification_body">Touch me to clear</string>
-
 </resources>
