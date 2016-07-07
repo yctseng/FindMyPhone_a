@@ -19,7 +19,7 @@ import java.util.UUID;
 
 public class MainActivity extends Activity {
     private static final String TAG = "PebbleFindMyPhone";
-    protected final boolean DEBUG = false;
+    protected final boolean DEBUG = true;
 
     // Must sync with the definitions on pebble app
     public static final int KEY_BUTTON_UP = 0;

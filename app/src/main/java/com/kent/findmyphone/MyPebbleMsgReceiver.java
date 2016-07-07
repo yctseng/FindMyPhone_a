@@ -58,6 +58,7 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                 myNotiBuilder.setSmallIcon(R.mipmap.ic_launcher);
                 myNotiBuilder.setContentTitle(context.getResources().getString(R.string.notification_title));
                 myNotiBuilder.setContentText(context.getResources().getString(R.string.notification_body));
+                myNotiBuilder.setVisibility(Notification.VISIBILITY_PUBLIC);
                 myNotiBuilder.setAutoCancel(true);
 
                 if(true) {
@@ -96,6 +97,8 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     // build notification and send
                     Notification notification = myNotiBuilder.build();
                     notification.flags |= Notification.FLAG_INSISTENT;
+                    notification.flags |= Notification.FLAG_ONGOING_EVENT;
+                    notification.priority = Notification.PRIORITY_MAX;
                     notification.flags |= Notification.FLAG_NO_CLEAR;
 
                     notificationManager.notify(MainActivity.notifyID, notification);
@@ -115,7 +118,9 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     // build notification and send
                     Notification notification = myNotiBuilder.build();
                     notification.flags |= Notification.FLAG_INSISTENT;
+                    notification.flags |= Notification.FLAG_ONGOING_EVENT;
                     notification.flags |= Notification.FLAG_NO_CLEAR;
+                    notification.priority = Notification.PRIORITY_MAX;
                     notificationManager.notify(MainActivity.notifyID, notification);
 
                     actionIntent.putExtra("mode", MainActivity.STRING_MODE_RINGING);
