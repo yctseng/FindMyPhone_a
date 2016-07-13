@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
+
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.util.Log;
@@ -76,9 +77,9 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                 }
 
                 // Cancel the notification first and maybe launch again to avoid some issues UNLESS it's QUERY_MODE
-                if (data.getInteger(MainActivity.KEY_QUERY_MODE) == null) {
-                    notificationManager.cancel(MainActivity.notifyID);
-                }
+//                if (data.getInteger(MainActivity.KEY_QUERY_MODE) == null) {
+//                    notificationManager.cancel(MainActivity.notifyID);
+//                }
                 // Used to launch app to setVolume to max level.
                 Intent actionIntent = new Intent();
                 actionIntent.setClassName("com.kent.findmyphone", "com.kent.findmyphone.MainActivity");
@@ -101,7 +102,7 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     notification.priority = Notification.PRIORITY_MAX;
                     notification.flags |= Notification.FLAG_NO_CLEAR;
 
-                    notificationManager.notify(MainActivity.notifyID, notification);
+//                    notificationManager.notify(MainActivity.notifyID, notification);
 
                     actionIntent.putExtra("mode", MainActivity.STRING_MODE_VIBRATE);
 
@@ -121,7 +122,7 @@ public class MyPebbleMsgReceiver extends BroadcastReceiver {
                     notification.flags |= Notification.FLAG_ONGOING_EVENT;
                     notification.flags |= Notification.FLAG_NO_CLEAR;
                     notification.priority = Notification.PRIORITY_MAX;
-                    notificationManager.notify(MainActivity.notifyID, notification);
+//                    notificationManager.notify(MainActivity.notifyID, notification);
 
                     actionIntent.putExtra("mode", MainActivity.STRING_MODE_RINGING);
 

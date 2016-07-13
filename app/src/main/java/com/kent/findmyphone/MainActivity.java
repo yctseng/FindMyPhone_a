@@ -5,8 +5,12 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -19,7 +23,7 @@ import java.util.UUID;
 
 public class MainActivity extends Activity {
     private static final String TAG = "PebbleFindMyPhone";
-    protected final boolean DEBUG = true;
+    protected final boolean DEBUG = false;
 
     // Must sync with the definitions on pebble app
     public static final int KEY_BUTTON_UP = 0;
@@ -39,7 +43,7 @@ public class MainActivity extends Activity {
     // Must the same as the UUID of the pebble app. Check the UUID in the settings of the project.
     public static final UUID APP_UUID = UUID.fromString("3783cff2-5a14-477d-baee-b77bd423d079");
     private PebbleKit.PebbleDataReceiver mDataReceiver = null;
-    private String mStartMode;
+    private String mStartMode = STRING_MODE_INIT;
     // id of the notification
     private Button mBtnStop;
     public static int notifyID = 334455;
@@ -51,18 +55,83 @@ public class MainActivity extends Activity {
     private boolean mStoped = false;
     private boolean mIsQueryMode = false;
 
-    private void restoreVolume() {
-        if (DEBUG) Log.v(TAG,"restoreVolume");
-        if(mOrigVolume > -1) {
+	private Vibrator mVibrator;
+	MediaPlayer mMediaPlayer;
+
+	private void startVibrate() {
+		Log.d(TAG, "startVibrate");
+		long[] pattern = {0, 1000, 500};
+		if( mVibrator == null) {
+			mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+		}
+		mVibrator.vibrate(pattern, 0);
+	}
+
+	private void stopVibrate() {
+		Log.d(TAG, "stopVibrate");
+		if( mVibrator == null) {
+			mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+		}
+		mVibrator.cancel();
+	}
+
+	private void startRinging() {
+		Log.d(TAG, "startRinging");
+		Uri uri= RingtoneManager.getActualDefaultRingtoneUri(getApplicationContext(), RingtoneManager.TYPE_RINGTONE);
+		AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+		if(mMediaPlayer == null) {
+			mMediaPlayer = MediaPlayer.create(getApplicationContext(), RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
+			mMediaPlayer.setLooping(true);
+		}
+		try {
+			mMediaPlayer.setVolume((float)1.0, (float)1.0);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		mMediaPlayer.start();
+
+        try {
+            am.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
+
+            if (mOrigVolume == -1) {
+                mOrigVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+                if(DEBUG) Log.d(TAG, "GET mOrigVolume:" + mOrigVolume);
+            }
+			int v = DEBUG ? 7:  am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+			am.setStreamVolume(AudioManager.STREAM_MUSIC, v, mVolumeFlags);
+		}
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+		if(DEBUG) Log.d(TAG, "Volume after startRinging:" + am.getStreamVolume(AudioManager.STREAM_MUSIC));
+	}
+
+	private void stopRinging() {
+		Log.d(TAG, "stopRinging");
+
+		if(mOrigVolume > -1) {
             AudioManager am=(AudioManager)getSystemService(Context.AUDIO_SERVICE);
             if( am != null) {
-                am.setStreamVolume(AudioManager.STREAM_NOTIFICATION, mOrigVolume, mVolumeFlags);
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, mOrigVolume, mVolumeFlags);
             }
             mOrigVolume = -1;
             if (DEBUG)
-                Log.d(TAG, "Volume after restoreVolume:" + am.getStreamVolume(AudioManager.STREAM_NOTIFICATION));
+                Log.d(TAG, "Volume after stopRinging:" + am.getStreamVolume(AudioManager.STREAM_MUSIC));
         }
-    }
+
+		if(mMediaPlayer == null) {
+			Log.w(TAG, "mMediaPlayer is null when stop Ringing!!");
+			return;
+		}
+		else {
+			try {
+				mMediaPlayer.stop();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
     private void updateState(Intent i) {
         String tmpMode;
@@ -80,15 +149,28 @@ public class MainActivity extends Activity {
             mIsQueryMode = false;
         }
 
+		if(STRING_MODE_VIBRATE.equals(mStartMode)) {
+			startVibrate();
+		}
+
+		if(STRING_MODE_RINGING.equals(mStartMode)) {
+			startRinging();
+		}
+
+		if(STRING_MODE_STOP.equals(mStartMode)) {
+			stopRinging();
+			stopVibrate();
+		}
+
         Log.d(TAG, "updateState result mStartMode:" + mStartMode + " mIsQueryMode:" + mIsQueryMode);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        if (DEBUG) Log.v(TAG, "onCreate");
+        if (DEBUG) Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        if (DEBUG) Log.v(TAG, "savedInstanceState:"+savedInstanceState);
+        if (DEBUG) Log.d(TAG, "savedInstanceState:"+savedInstanceState);
         if(savedInstanceState != null) {
             mOrigVolume = savedInstanceState.getInt("origVolume");
             if (DEBUG) Log.d(TAG, "onCreate getInt from savedInstanceState origVolume:" + mOrigVolume);
@@ -97,7 +179,7 @@ public class MainActivity extends Activity {
         Intent initIntent = this.getIntent();
         updateState(initIntent);
 
-        if(DEBUG) Log.d(TAG,"mode:"+mStartMode+" vs "+STRING_MODE_STOP);
+        if(DEBUG) Log.d(TAG,"mode:"+mStartMode);
 
         if(STRING_MODE_STOP.equals(mStartMode) ) {
             if(DEBUG) Log.d(TAG, "on create should finish!!");
@@ -108,18 +190,6 @@ public class MainActivity extends Activity {
         }
         if(mIsQueryMode) {
             notifyPebbleState(mStartMode);
-            if(mStartMode == null) {
-                if (DEBUG) Log.d(TAG, "on create should finish due to Query mode!!");
-                //finish();
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        // Close this activity
-                        finish();
-                    }
-                }, mFinishTimer);
-                //return;
-            }
         }
         setContentView(R.layout.activity_main);
         mBtnStop = (Button) findViewById(R.id.button_stop);
@@ -138,30 +208,11 @@ public class MainActivity extends Activity {
             }
         });
 
-        try {
-            AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            am.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
-
-            if (mOrigVolume == -1 && mStartMode !=null) {
-                mOrigVolume = am.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
-                if(DEBUG) Log.d(TAG, "GET mOrigVolume:" + mOrigVolume);
-
-                if(DEBUG) Log.d(TAG, "MAX:" + am.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION));
-
-                int v = DEBUG ? 4 :  am.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION);
-                am.setStreamVolume(AudioManager.STREAM_NOTIFICATION, v, mVolumeFlags);
-                if(DEBUG) Log.d(TAG, "Volume after onCreate:" + am.getStreamVolume(AudioManager.STREAM_NOTIFICATION));
-            }
-        }
-        catch(Exception e) {
-            Log.e(TAG, "onCreate exception:"+e);
-            finish();
-        }
     }
 
     @Override
     public void onPause() {
-        if(DEBUG) Log.v(TAG, "onPause");
+        if(DEBUG) Log.d(TAG, "onPause");
         super.onPause();
         if(mDataReceiver != null) {
             unregisterReceiver(mDataReceiver);
@@ -171,55 +222,25 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onResume() {
-        if(DEBUG) Log.v(TAG, "onResume");
+        if(DEBUG) Log.d(TAG, "onResume");
         super.onResume();
 
         if(mStoped) {
             if(DEBUG) Log.w(TAG, "mStoped:"+mStoped+" onResume STOP!!!");
-            finish();
             notifyPebbleState(STRING_MODE_STOP);
+            finish();
             return;
         }
         if(mStartMode != null)
             notifyPebbleState(mStartMode);
         else
             Toast.makeText(getApplicationContext(), R.string.warning_not_launch_on_pebble, Toast.LENGTH_SHORT).show();
+
         Context context = getApplicationContext();
         boolean isConnected = PebbleKit.isWatchConnected(context);
-        if(isConnected) {
-            // We don't need to launch the app on pebble yet in current design.
-            //PebbleKit.startAppOnPebble(context, APP_UUID);
-            if (mDataReceiver == null) {
-                // For now, we handled the keyevents in MyPebbleMsgReceiver.java. This receiver is left for future design.
-                mDataReceiver = new PebbleKit.PebbleDataReceiver(APP_UUID) {
-                    @Override
-                    public void receiveData(Context context, int transactionId, PebbleDictionary dict) {
-                        // Message received, over!
-                        PebbleKit.sendAckToPebble(context, transactionId);
-                        if(DEBUG) Log.i(TAG, "Got message from Pebble!");
-                        if (dict.getInteger(KEY_BUTTON_UP) != null) {
-                            if(DEBUG) Log.i(TAG, "KEY_BUTTON_UP");
-                        }
 
-                        if (dict.getInteger(KEY_BUTTON_DOWN) != null) {
-                            if(DEBUG) Log.i(TAG, "KEY_BUTTON_DOWN");
-                        }
-
-                        if (dict.getInteger(KEY_BUTTON_SELECT) != null) {
-                            if(DEBUG) Log.i(TAG, "KEY_BUTTON_SELECT");
-                        }
-                        if (dict.getInteger(KEY_QUERY_MODE) != null) {
-                            if(DEBUG) Log.i(TAG, "KEY_QUERY_MODE");
-                            if(mStartMode != null)
-                                notifyPebbleState(mStartMode);
-                        }
-                    }
-                };
-            }
-            PebbleKit.registerReceivedDataHandler(this, mDataReceiver);
-        }
-        else {
-            Toast.makeText(getApplicationContext(), "Pebble is not connected!!!", Toast.LENGTH_LONG).show();
+		if(!isConnected) {
+			Toast.makeText(getApplicationContext(), "Pebble is not connected!", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -235,19 +256,20 @@ public class MainActivity extends Activity {
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
-        if(DEBUG) Log.v(TAG, "onSaveInstanceState");
+        if(DEBUG) Log.d(TAG, "onSaveInstanceState");
         savedInstanceState.putInt("origVolume", mOrigVolume);
         if(DEBUG) Log.d(TAG, "savedInstanceState:"+savedInstanceState);
     }
     @Override
     public void finish() {
         super.finish();
-        restoreVolume();
+        stopRinging();
+		stopVibrate();
         //notifyPebbleState(STRING_MODE_STOP);
     }
 
     protected void onNewIntent(Intent intent) {
-        if(DEBUG) Log.v(TAG, "onNewIntent:"+intent);
+        if(DEBUG) Log.d(TAG, "onNewIntent:"+intent);
         super.onNewIntent(intent);
         setIntent(intent);//must store the new intent unless getIntent() will return the old one
 
@@ -280,7 +302,7 @@ public class MainActivity extends Activity {
         if(DEBUG) Log.d(TAG, "notifyPebbleState mode:"+mode);
         String nowMode;
 
-        if(mode== null) {
+        if(mode == null) {
             nowMode = STRING_MODE_INIT;
         }
         else {
