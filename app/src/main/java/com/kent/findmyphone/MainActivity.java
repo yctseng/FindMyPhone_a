@@ -1,7 +1,6 @@
 package com.kent.findmyphone;
 
 import android.app.Activity;
-import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
@@ -42,11 +41,8 @@ public class MainActivity extends Activity {
 
     // Must the same as the UUID of the pebble app. Check the UUID in the settings of the project.
     public static final UUID APP_UUID = UUID.fromString("3783cff2-5a14-477d-baee-b77bd423d079");
-    private PebbleKit.PebbleDataReceiver mDataReceiver = null;
     private String mStartMode = STRING_MODE_INIT;
-    // id of the notification
     private Button mBtnStop;
-    public static int notifyID = 334455;
 
     private int mFinishTimer = 2000;
     private int mOrigVolume = -1;
@@ -170,12 +166,6 @@ public class MainActivity extends Activity {
         if (DEBUG) Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
 
-        if (DEBUG) Log.d(TAG, "savedInstanceState:"+savedInstanceState);
-        if(savedInstanceState != null) {
-            mOrigVolume = savedInstanceState.getInt("origVolume");
-            if (DEBUG) Log.d(TAG, "onCreate getInt from savedInstanceState origVolume:" + mOrigVolume);
-       }
-
         Intent initIntent = this.getIntent();
         updateState(initIntent);
 
@@ -196,28 +186,12 @@ public class MainActivity extends Activity {
         mBtnStop.setOnClickListener(new Button.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                if (notificationManager != null) {
-                    notificationManager.cancel(MainActivity.notifyID);
-                } else {
-                    Log.e(TAG, getResources().getString(R.string.err_notification_mgr_null));
-                }
                 Toast.makeText(getApplicationContext(), R.string.action_app_terminate, Toast.LENGTH_SHORT).show();
                 finish();
                 notifyPebbleState(STRING_MODE_STOP);
             }
         });
 
-    }
-
-    @Override
-    public void onPause() {
-        if(DEBUG) Log.d(TAG, "onPause");
-        super.onPause();
-        if(mDataReceiver != null) {
-            unregisterReceiver(mDataReceiver);
-            mDataReceiver = null;
-        }
     }
 
     @Override
@@ -245,27 +219,10 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    public void onRestoreInstanceState(Bundle savedInstanceState) {
-        // Always call the superclass so it can restore the view hierarchy
-        super.onRestoreInstanceState(savedInstanceState);
-
-        if(DEBUG) Log.d(TAG, "onRestoreInstanceState:"+savedInstanceState);
-
-    }
-
-    @Override
-    public void onSaveInstanceState(Bundle savedInstanceState) {
-        super.onSaveInstanceState(savedInstanceState);
-        if(DEBUG) Log.d(TAG, "onSaveInstanceState");
-        savedInstanceState.putInt("origVolume", mOrigVolume);
-        if(DEBUG) Log.d(TAG, "savedInstanceState:"+savedInstanceState);
-    }
-    @Override
     public void finish() {
         super.finish();
         stopRinging();
 		stopVibrate();
-        //notifyPebbleState(STRING_MODE_STOP);
     }
 
     protected void onNewIntent(Intent intent) {
